@@ -1,6 +1,32 @@
+# Python
 venv/*
-data/
-.vscode/
 __pycache__/
 *.pyc
+*.pyo
+*.egg-info/
+.Python
+
+
+data/*.csv
+data/language_detection/generated/*.json
+data/language_detection/raw/*.json
+data/language_detection/splits/*.json
+models/**/*.bin
+models/**/*.pth
+models/**/checkpoints/
+
+# IDE
+.vscode/
+.idea/
+
+# Jupyter
 notebooks/.ipynb_checkpoints
+*.ipynb_checkpoints
+
+# Experiments & logs
+experiments/**/plots/
+experiments/**/checkpoints/
+*.log
+
+# UI Design assets
+UI design/
