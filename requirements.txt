@@ -5,3 +5,5 @@ matplotlib
 scikit-learn
 torch
 transformers
+groq>=0.4.0
+python-dotenv

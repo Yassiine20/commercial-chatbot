@@ -79,7 +79,6 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-
 ## Usage
 
 ### Step 1: Generate Dataset
@@ -199,5 +198,3 @@ Code-switched samples are labeled by their dominant language.
 
 - Input: User message text
 - Output: Language label (en, fr, ar, tn_latn, tn_arab)
-
-

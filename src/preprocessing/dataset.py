@@ -1,18 +1,18 @@
 import json
 import torch
 from torch.utils.data import Dataset
-from transformers import XLMRobertaTokenizer
+from transformers import AutoTokenizer
 
 
 class LanguageDataset(Dataset):
-    def __init__(self, json_path, max_length=128):
+    def __init__(self, json_path, max_length=128, model_name='xlm-roberta-base'):
         with open(json_path, 'r') as f:
             data = json.load(f)
         
         self.samples = data['samples']
-        self.tokenizer = XLMRobertaTokenizer.from_pretrained('xlm-roberta-base')
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.max_length = max_length
-        self.label_map = {'en': 0, 'fr': 1, 'ar': 2, 'tn_latn': 3, 'tn_arab': 4}
+        self.label_map = {'en': 0, 'fr': 1, 'ar': 2, 'tn_latn': 3}
     
     def __len__(self):
         return len(self.samples)

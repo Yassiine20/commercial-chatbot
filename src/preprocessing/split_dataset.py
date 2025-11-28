@@ -39,7 +39,7 @@ if __name__ == '__main__':
     
     parser = argparse.ArgumentParser()
     parser.add_argument('--input', default='data/raw/combined_dataset.json')
-    parser.add_argument('--output-dir', default='data/processed')
+    parser.add_argument('--output-dir', default='data/language_detection/splits')
     parser.add_argument('--seed', type=int, default=42)
     args = parser.parse_args()
     

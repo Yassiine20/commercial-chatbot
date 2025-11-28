@@ -2,10 +2,10 @@ from torch.utils.data import DataLoader
 from .dataset import LanguageDataset
 
 
-def create_dataloaders(batch_size=16):
-    train_dataset = LanguageDataset('data/processed/train.json')
-    val_dataset = LanguageDataset('data/processed/val.json')
-    test_dataset = LanguageDataset('data/processed/test.json')
+def get_dataloaders(batch_size=16, model_name='xlm-roberta-base', max_length=128):
+    train_dataset = LanguageDataset('data/language_detection/splits/train.json', max_length=max_length, model_name=model_name)
+    val_dataset = LanguageDataset('data/language_detection/splits/val.json', max_length=max_length, model_name=model_name)
+    test_dataset = LanguageDataset('data/language_detection/splits/test.json', max_length=max_length, model_name=model_name)
     
     train_loader = DataLoader(
         train_dataset,
