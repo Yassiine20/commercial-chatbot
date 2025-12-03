@@ -8,7 +8,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from models.xlm_roberta import XLMRobertaClassifier
 from training.trainer import Trainer
-from data.preprocessing.data_loaders import get_dataloaders
+from preprocessing.data_loaders import get_dataloaders
 
 
 def main():

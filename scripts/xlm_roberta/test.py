@@ -8,7 +8,7 @@ from tqdm import tqdm
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from models.xlm_roberta import XLMRobertaClassifier
-from data.preprocessing.data_loaders import get_dataloaders
+from preprocessing.data_loaders import get_dataloaders
 
 
 def evaluate_model(model, test_loader, device):
