@@ -68,7 +68,7 @@ experiments/**/*.pt
 experiments/**/*.pth
 
 # Keep experiment configs and results
-!experiments/**/config.json
+
 !experiments/**/metrics.json
 !experiments/**/test_results.json
 
@@ -158,7 +158,7 @@ secrets/
 # Configuration (Conditional)
 # ============================================
 # Ignore all configs except examples
-configs/
+
 !configs/**/.gitkeep
 !configs/**/example_*.json
 !configs/**/example_*.yaml

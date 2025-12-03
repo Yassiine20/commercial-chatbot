@@ -1,0 +1,18 @@
+{
+    "model_name": "xlm-roberta-base",
+    "num_labels": 5,
+    "batch_size": 1,
+    "learning_rate": 2e-4,
+    "epochs": 5,
+    "save_dir": "experiments/xlm_roberta_run2",
+    "gradient_accumulation_steps": 16,
+    "use_fp16": false,
+    "optimizer": "adamw",
+    "gradient_checkpointing": true,
+    "load_in_8bit": true,
+    "use_lora": true,
+    "lora_r": 16,
+    "lora_alpha": 32,
+    "lora_dropout": 0.05,
+    "max_length": 128
+}
