@@ -1,5 +1,5 @@
 """
-Chatbot Pipeline with Language Detection and Translation
+Chatbot Pipeline with Language Detection and LangChain Translation
 Handles multilingual conversations for ASOS product recommendations
 
 TODO: Implement product classification
@@ -41,9 +41,9 @@ class ChatbotPipeline:
         )
         print("✓ Language detector loaded (4 languages: en, fr, ar, tn_latn)")
         
-        # Translator (Groq)
+        # Translator (LangChain + Groq)
         self.translator = GroqTranslator()
-        print("✓ Translator loaded")
+        print("✓ LangChain translator loaded")
     
     def process_message(self, user_input: str) -> Dict:
 
@@ -120,9 +120,8 @@ def main():
     test_messages = [
         "I want a black jacket",
         "Je veux un pull noire",
-        "na7eb nechri jacket k7el",
-        "نحب نشري جاكيت كحل",
-        "n7eb nechri maryoul abyedh"
+        "na7eb nechri jacket ka7la",
+        "أريد شراء جاكيت أسود"
     ]
     
     for msg in test_messages:

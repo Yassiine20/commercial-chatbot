@@ -1,16 +1,18 @@
 """
-Groq-based translator for multilingual chatbot
+LangChain-based translator for multilingual chatbot
 Supports: English, French, Arabic, Tunisian Latin
 """
 import os
-from groq import Groq
 from dotenv import load_dotenv
+from langchain_groq import ChatGroq
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
 
 load_dotenv()
 
 
 class GroqTranslator:
-    """Translation using Groq API"""
+    """Translation using LangChain with Groq"""
     
     LANGUAGE_NAMES = {
         'en': 'English',
@@ -19,9 +21,9 @@ class GroqTranslator:
         'tn_latn': 'Tunisian (Latin script)'
     }
     
-    def __init__(self, api_key=None, model="llama-3.3-70b-versatile"):
+    def __init__(self, api_key=None, model="openai/gpt-oss-20b"):
         """
-        Initialize Groq translator
+        Initialize LangChain Groq translator
         
         Args:
             api_key: Groq API key (defaults to GROQ_API_KEY env var)
@@ -31,12 +33,26 @@ class GroqTranslator:
         if not self.api_key:
             raise ValueError("GROQ_API_KEY not found in environment variables")
         
-        self.client = Groq(api_key=self.api_key)
-        self.model = model
+        # Initialize LangChain ChatGroq
+        self.llm = ChatGroq(
+            api_key=self.api_key,
+            model=model,
+            temperature=0.3,
+            max_tokens=500
+        )
+        
+        # Create translation prompt template
+        self.translation_prompt = ChatPromptTemplate.from_messages([
+            ("system", "You are a professional translator. Translate text from {source_lang} to {target_lang} accurately and naturally. Return only the translation without any additional text or explanations."),
+            ("user", "Translate the following text from {source_lang} to {target_lang}.\nOnly return the translation, no explanations or additional text.\n\nText to translate: {text}\n\nTranslation:")
+        ])
+        
+        # Create translation chain
+        self.translation_chain = self.translation_prompt | self.llm | StrOutputParser()
     
     def translate(self, text: str, source_lang: str, target_lang: str) -> str:
         """
-        Translate text between languages
+        Translate text between languages using LangChain
         
         Args:
             text: Text to translate
@@ -54,33 +70,15 @@ class GroqTranslator:
         source_name = self.LANGUAGE_NAMES.get(source_lang, source_lang)
         target_name = self.LANGUAGE_NAMES.get(target_lang, target_lang)
         
-        # Build translation prompt
-        prompt = f"""Translate the following text from {source_name} to {target_name}.
-                Only return the translation, no explanations or additional text.
-                Text to translate: {text}
-
-                Translation:"""
-        
         try:
-            # Call Groq API
-            chat_completion = self.client.chat.completions.create(
-                messages=[
-                    {
-                        "role": "system",
-                        "content": f"You are a professional translator. Translate text from {source_name} to {target_name} accurately and naturally. Return only the translation without any additional text or explanations."
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                model=self.model,
-                temperature=0.3,  # Low temperature for consistent translations
-                max_tokens=500
-            )
+            # Use LangChain chain for translation
+            translation = self.translation_chain.invoke({
+                "source_lang": source_name,
+                "target_lang": target_name,
+                "text": text
+            })
             
-            translation = chat_completion.choices[0].message.content.strip()
-            return translation
+            return translation.strip()
             
         except Exception as e:
             print(f"Translation error: {e}")
@@ -89,7 +87,7 @@ class GroqTranslator:
     
     def translate_batch(self, texts: list, source_lang: str, target_lang: str) -> list:
         """
-        Translate multiple texts
+        Translate multiple texts using LangChain batch processing
         
         Args:
             texts: List of texts to translate
@@ -102,12 +100,28 @@ class GroqTranslator:
         if source_lang == target_lang:
             return texts
         
-        translations = []
-        for text in texts:
-            translation = self.translate(text, source_lang, target_lang)
-            translations.append(translation)
+        # Get language names
+        source_name = self.LANGUAGE_NAMES.get(source_lang, source_lang)
+        target_name = self.LANGUAGE_NAMES.get(target_lang, target_lang)
         
-        return translations
+        try:
+            # Use LangChain batch processing
+            inputs = [
+                {
+                    "source_lang": source_name,
+                    "target_lang": target_name,
+                    "text": text
+                }
+                for text in texts
+            ]
+            
+            translations = self.translation_chain.batch(inputs)
+            return [t.strip() for t in translations]
+            
+        except Exception as e:
+            print(f"Batch translation error: {e}")
+            # Fallback: return original texts
+            return texts
 
 
 def test_translator():
