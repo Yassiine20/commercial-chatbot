@@ -9,8 +9,8 @@ from models.xlm_roberta import XLMRobertaClassifier
 class LanguageDetector:
     """Wrapper for XLM-RoBERTa language detection model"""
     
-    # Language mapping
-    LABEL_TO_LANG = {0: 'en', 1: 'fr', 2: 'ar', 3: 'tn_latn'}
+    # Language mapping (5th label maps to ar for compatibility)
+    LABEL_TO_LANG = {0: 'en', 1: 'fr', 2: 'ar', 3: 'tn_latn', 4: 'ar'}
     
     def __init__(self, model, tokenizer, device='cpu'):
         self.model = model
@@ -31,25 +31,30 @@ class LanguageDetector:
         Returns:
             LanguageDetector instance
         """
-        # Initialize model (4 languages: en, fr, ar, tn_latn)
+        # Initialize model (5 languages to match checkpoint)
         model = XLMRobertaClassifier(
-            num_labels=4,
+            num_labels=5,
             model_name=model_name,
             gradient_checkpointing=False,
-            load_in_8bit=False,
-            use_lora=False
+            load_in_8bit=True,
+            use_lora=True,
+            lora_r=16,
+            lora_alpha=32,
+            lora_dropout=0.05
         )
         
         # Load trained weights
         checkpoint = torch.load(checkpoint_path, map_location=device)
-        model.load_state_dict(checkpoint)
-        model = model.to(device)
+        model.load_state_dict(checkpoint, strict=False)
         model.eval()
         
         # Load tokenizer
         tokenizer = AutoTokenizer.from_pretrained(model_name)
         
-        return cls(model, tokenizer, device)
+        # 8-bit models are auto-loaded on GPU, so use 'cuda' as device
+        actual_device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        
+        return cls(model, tokenizer, actual_device)
     
     def predict(self, text, max_length=128):
         """

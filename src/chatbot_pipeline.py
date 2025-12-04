@@ -119,9 +119,10 @@ def main():
     # Test messages
     test_messages = [
         "I want a black jacket",
-        "Je veux une veste noire",
+        "Je veux un pull noire",
         "na7eb nechri jacket k7el",
-        "نحب نشري جاكيت كحل"
+        "نحب نشري جاكيت كحل",
+        "n7eb nechri maryoul abyedh"
     ]
     
     for msg in test_messages:
