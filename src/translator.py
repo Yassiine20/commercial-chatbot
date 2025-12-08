@@ -4,15 +4,15 @@ Supports: English, French, Arabic, Tunisian Latin
 """
 import os
 from dotenv import load_dotenv
-from langchain_groq import ChatGroq
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
 load_dotenv()
 
 
-class GroqTranslator:
-    """Translation using LangChain with Groq"""
+class GeminiTranslator:
+    """Translation using LangChain with Google Gemini"""
     
     LANGUAGE_NAMES = {
         'en': 'English',
@@ -21,24 +21,24 @@ class GroqTranslator:
         'tn_latn': 'Tunisian (Latin script)'
     }
     
-    def __init__(self, api_key=None, model="openai/gpt-oss-20b"):
+    def __init__(self, api_key=None, model="gemini-2.5-flash"):
         """
-        Initialize LangChain Groq translator
+        Initialize LangChain Gemini translator
         
         Args:
-            api_key: Groq API key (defaults to GROQ_API_KEY env var)
-            model: Groq model to use
+            api_key: Gemini API key (defaults to GEMINI_API_KEY env var)
+            model: Gemini model to use (default: gemini-2.5-flash)
         """
-        self.api_key = api_key or os.getenv('GROQ_API_KEY')
+        self.api_key = api_key or os.getenv('GEMINI_API_KEY')
         if not self.api_key:
-            raise ValueError("GROQ_API_KEY not found in environment variables")
+            raise ValueError("GEMINI_API_KEY not found in environment variables")
         
-        # Initialize LangChain ChatGroq
-        self.llm = ChatGroq(
+        # Initialize LangChain ChatGoogleGenerativeAI
+        self.llm = ChatGoogleGenerativeAI(
             api_key=self.api_key,
             model=model,
             temperature=0.3,
-            max_tokens=500
+            max_output_tokens=500
         )
         
         # Create translation prompt template
@@ -126,9 +126,9 @@ class GroqTranslator:
 
 def test_translator():
     """Test the translator"""
-    print("Testing Groq Translator...")
+    print("Testing Gemini Translator...")
     
-    translator = GroqTranslator()
+    translator = GeminiTranslator()
     
     # Test cases
     test_cases = [
@@ -137,7 +137,8 @@ def test_translator():
         ("na7eb jacket ka7la", "tn_latn", "en"),
         ("أريد سترة سوداء", "ar", "en"),
         ("I'm looking for red shoes", "en", "ar"),
-        ("Chemise bleue pour homme", "fr", "en")
+        ("Chemise bleue pour homme", "fr", "en"),
+        ("n7eb maryoul abyedh", "tn_latn", "en")
     ]
     
     print("\n" + "="*70)

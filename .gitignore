@@ -37,6 +37,7 @@ data/**/*.csv
 data/language_detection/generated/*.json
 data/language_detection/raw/*.json
 data/language_detection/splits/*.json
+data/intent_classification/
 
 # Product data cache
 data/products/embeddings/

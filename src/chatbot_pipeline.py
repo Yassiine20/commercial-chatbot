@@ -16,7 +16,8 @@ from typing import Dict
 sys.path.insert(0, str(Path(__file__).parent))
 
 from language_detector import LanguageDetector
-from translator import GroqTranslator
+from translator import GeminiTranslator
+from intent_classifier import IntentClassifier
 
 # Load environment variables
 load_dotenv()
@@ -28,6 +29,7 @@ class ChatbotPipeline:
     def __init__(self):
         self.language_detector = None
         self.translator = None
+        self.intent_classifier = None
         
     def load_models(self):
         """Load all required models"""
@@ -41,9 +43,17 @@ class ChatbotPipeline:
         )
         print("✓ Language detector loaded (4 languages: en, fr, ar, tn_latn)")
         
-        # Translator (LangChain + Groq)
-        self.translator = GroqTranslator()
-        print("✓ LangChain translator loaded")
+        # Translator (LangChain + Gemini)
+        self.translator = GeminiTranslator()
+        print("✓ LangChain Gemini translator loaded")
+        
+        # Intent classifier (DistilBERT trained model)
+        self.intent_classifier = IntentClassifier.load_from_checkpoint(
+            checkpoint_path='experiments/DistelBert/best_model.pt',
+            model_name='distilbert-base-uncased',
+            device='cpu'
+        )
+        print("✓ Intent classifier loaded (binary: in_context/out_of_context)")
     
     def process_message(self, user_input: str) -> Dict:
 
@@ -84,13 +94,39 @@ class ChatbotPipeline:
             query_english = user_input
             print(f"Already in English, no translation needed")
         
+        # Step 2.5: Check if query is in-context (shopping-related)
+        print("\n[2.5] Checking intent...")
+        intent_result = self.intent_classifier.predict(query_english)
+        intent = intent_result['intent']
+        intent_confidence = intent_result['confidence']
+        
+        print(f"    Intent: {intent} (confidence: {intent_confidence:.2f})")
+        
+        # Reject out-of-context queries
+        if intent == 'out_of_context' and intent_confidence > 0.75:
+            print("    ⚠️  Out-of-context query detected - rejecting")
+            return {
+                'status': 'rejected',
+                'reason': 'out_of_context',
+                'message': 'I can only help with shopping and product recommendations. What product are you looking for?',
+                'detected_language': detected_lang,
+                'language_confidence': confidence,
+                'intent': intent,
+                'intent_confidence': intent_confidence,
+                'query_english': query_english,
+                'original_query': user_input
+            }
+        
         # TODO: Step 3 - Product Classification
         # TODO: Step 4 - Product Search  
         # TODO: Step 5 - Response Generation
         
         result = {
+            'status': 'success',
             'detected_language': detected_lang,
             'language_confidence': confidence,
+            'intent': intent,
+            'intent_confidence': intent_confidence,
             'query_english': query_english,
             'original_query': user_input
         }
@@ -116,12 +152,16 @@ def main():
     print("CHATBOT READY!")
     print("="*60)
     
-    # Test messages
+    # Test messages (mix of in-context and out-of-context)
     test_messages = [
-        "I want a black jacket",
-        "Je veux un pull noire",
-        "na7eb nechri jacket ka7la",
-        "أريد شراء جاكيت أسود"
+        "I want a black jacket",              # in-context (English)
+        "Je veux un pull noire",              # in-context (French)
+        "What's the weather like?",           # out-of-context (English)
+        "na7eb nechri jacket ka7la",          # in-context (Tunisian)
+        "أريد شراء جاكيت أسود",              # in-context (Arabic)
+        "Tell me a joke",                     # out-of-context (English)
+        "Show me red dresses",                # in-context (English)
+        "9addech el wa9t?",                   # out-of-context (Tunisian - "what time is it?")
     ]
     
     for msg in test_messages:
