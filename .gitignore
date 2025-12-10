@@ -1,6 +1,259 @@
-venv/*
-data/
-.vscode/
+# ============================================
+# Python
+# ============================================
+# Byte-compiled / optimized / DLL files
 __pycache__/
-*.pyc
-notebooks/.ipynb_checkpoints
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+.Python
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+wheels/
+
+# PyInstaller
+*.manifest
+*.spec
+
+# ============================================
+# Data Files
+# ============================================
+# Large CSV files (keep cleaned versions in git if needed)
+data/*.csv
+data/**/*.csv
+
+# Generated datasets
+data/language_detection/generated/*.json
+data/language_detection/raw/*.json
+data/language_detection/splits/*.json
+data/intent_classification/
+
+# Product data cache
+data/products/embeddings/
+data/cache/
+
+# Processed data (optional - uncomment if too large)
+# data/processed/
+
+# ============================================
+# Machine Learning Models
+# ============================================
+# Model weights and checkpoints
+*.pt
+*.pth
+*.bin
+*.h5
+*.ckpt
+*.safetensors
+
+# Model directories
+models/**/checkpoints/
+models/**/*.bin
+models/**/*.pth
+
+# Experiments (keep config and results, ignore weights)
+experiments/**/checkpoints/
+experiments/**/plots/
+experiments/**/*.pt
+experiments/**/*.pth
+
+# Keep experiment configs and results
+
+!experiments/**/metrics.json
+!experiments/**/test_results.json
+
+# ============================================
+# Logs and Outputs
+# ============================================
+*.log
+logs/
+*.out
+*.err
+
+# TensorBoard
+runs/
+tensorboard/
+
+# MLflow
+mlruns/
+
+# Weights & Biases
+wandb/
+
+# ============================================
+# IDE and Editors
+# ============================================
+# VSCode
+.vscode/
+*.code-workspace
+
+# PyCharm
+.idea/
+*.iml
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# ============================================
+# Jupyter Notebooks
+# ============================================
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+
+# Jupyter Notebook metadata
+.jupyter/
+
+# ============================================
+# Testing and Coverage
+# ============================================
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# ============================================
+# Environment and Secrets
+# ============================================
+.env
+.env.local
+.env.*.local
+*.env
+
+# Keep example env file
+!.env.example
+
+# API keys and secrets
+secrets/
+*.key
+*.pem
+
+# ============================================
+# Configuration (Conditional)
+# ============================================
+# Ignore all configs except examples
+
+!configs/**/.gitkeep
+!configs/**/example_*.json
+!configs/**/example_*.yaml
+
+# Keep specific config structure visible
+!configs/README.md
+
+# ============================================
+# OS Files
+# ============================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+.directory
+.Trash-*
+
+# ============================================
+# Project Specific
+# ============================================
+# UI Design assets
+UI design/
+ui_design/
+design_assets/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Cache directories
+.cache/
+cache/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Redis dumps
+dump.rdb
+
+# ============================================
+# Docker
+# ============================================
+# Docker volumes
+docker-compose.override.yml
+.dockerignore
+
+# ============================================
+# Documentation Build
+# ============================================
+docs/_build/
+docs/.doctrees/
+site/
+
+# ============================================
+# Package Manager
+# ============================================
+# pip
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Poetry
+poetry.lock
+
+# Pipenv
+Pipfile.lock
+
+# ============================================
+# Misc
+# ============================================
+# Backup files
+*.bak
+*.backup
+*~
+
+# Compressed files (if used for data)
+# *.zip
+# *.tar.gz
+# *.rar
+
+# Large media files (uncomment if needed)
+# *.mp4
+# *.avi
+# *.mov
+# *.mp3
+# *.wav

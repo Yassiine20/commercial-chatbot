@@ -162,18 +162,44 @@ function removeTypingIndicator() {
     }
 }
 
-function simulateBotResponse(userMessage) {
+async function simulateBotResponse(userMessage) {
     isTyping = true;
     showTypingIndicator();
 
-    // Simulate delay
-    setTimeout(() => {
+    try {
+        // Call the Flask API
+        const response = await fetch('http://localhost:5000/api/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ message: userMessage })
+        });
+
+        const data = await response.json();
+        
         removeTypingIndicator();
-        const response = generateBotResponse(userMessage);
-        addMessage(response, 'bot');
-        saveChatMessage(response, 'bot');
-        isTyping = false;
-    }, 1000 + Math.random() * 1000);
+        
+        if (data.error) {
+            addMessage('Sorry, there was an error processing your request.', 'bot');
+        } else {
+            // Add bot response
+            addMessage(data.response, 'bot');
+            saveChatMessage(data.response, 'bot');
+            
+            // Display products if any
+            if (data.products && data.products.length > 0) {
+                displayProducts(data.products);
+            }
+        }
+        
+    } catch (error) {
+        console.error('Error:', error);
+        removeTypingIndicator();
+        addMessage('Sorry, I\'m having trouble connecting to the server. Please try again.', 'bot');
+    }
+    
+    isTyping = false;
 }
 
 function generateBotResponse(userMessage) {
@@ -201,6 +227,30 @@ function generateBotResponse(userMessage) {
 
 function scrollToBottom() {
     elements.chatContainer.scrollTop = elements.chatContainer.scrollHeight;
+}
+
+function displayProducts(products) {
+    const productContainer = document.createElement('div');
+    productContainer.className = 'product-list';
+    productContainer.style.cssText = 'display: flex; gap: 15px; flex-wrap: wrap; margin: 10px 0; padding: 10px;';
+    
+    products.forEach(product => {
+        const productCard = document.createElement('div');
+        productCard.className = 'product-card';
+        productCard.style.cssText = 'border: 1px solid #e5e7eb; border-radius: 8px; padding: 15px; flex: 1; min-width: 200px; max-width: 250px; background: #f9fafb;';
+        productCard.innerHTML = `
+            <div class="product-info">
+                <h4 style="font-size: 14px; margin: 0 0 8px 0; color: #111827;">${product.name}</h4>
+                <p style="font-size: 12px; color: #6b7280; margin: 4px 0;">${product.color}</p>
+                <p style="font-size: 16px; font-weight: 600; color: #059669; margin: 8px 0;">£${product.price}</p>
+                <a href="${product.url}" target="_blank" style="font-size: 13px; color: #2563eb; text-decoration: none;">View Product →</a>
+            </div>
+        `;
+        productContainer.appendChild(productCard);
+    });
+    
+    elements.messages.appendChild(productContainer);
+    scrollToBottom();
 }
 
 // ==================== CHAT HISTORY ====================

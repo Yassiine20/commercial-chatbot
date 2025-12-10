@@ -2,3 +2,12 @@ pandas
 numpy
 seaborn
 matplotlib
+scikit-learn
+torch
+transformers
+langchain>=0.1.0
+langchain-google-genai>=0.1.0
+langchain-core>=0.1.0
+python-dotenv
+flask
+flask-cors
