@@ -2,6 +2,7 @@
 let chatHistory = [];
 let currentChatId = null;
 let isTyping = false;
+let sessionId = localStorage.getItem('chatbot_session_id') || null;
 
 // ==================== DOM ELEMENTS ====================
 const elements = {
@@ -167,16 +168,26 @@ async function simulateBotResponse(userMessage) {
     showTypingIndicator();
 
     try {
-        // Call the Flask API
+        // Call the Flask API with session ID for conversation context
         const response = await fetch('http://localhost:5000/api/chat', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ message: userMessage })
+            credentials: 'include',
+            body: JSON.stringify({ 
+                message: userMessage,
+                session_id: sessionId 
+            })
         });
 
         const data = await response.json();
+        
+        // Store session ID for maintaining conversation history
+        if (data.session_id) {
+            sessionId = data.session_id;
+            localStorage.setItem('chatbot_session_id', sessionId);
+        }
         
         removeTypingIndicator();
         
@@ -190,6 +201,11 @@ async function simulateBotResponse(userMessage) {
             // Display products if any
             if (data.products && data.products.length > 0) {
                 displayProducts(data.products);
+            }
+            
+            // Log conversation context info
+            if (data.metadata && data.metadata.conversation_turns) {
+                console.log(`Conversation turns: ${data.metadata.conversation_turns}`);
             }
         }
         
@@ -237,13 +253,37 @@ function displayProducts(products) {
     products.forEach(product => {
         const productCard = document.createElement('div');
         productCard.className = 'product-card';
-        productCard.style.cssText = 'border: 1px solid #e5e7eb; border-radius: 8px; padding: 15px; flex: 1; min-width: 200px; max-width: 250px; background: #f9fafb;';
+        productCard.style.cssText = 'border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; flex: 1; min-width: 200px; max-width: 250px; background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: transform 0.2s;';
+        
+        // Add hover effect
+        productCard.onmouseenter = () => productCard.style.transform = 'translateY(-4px)';
+        productCard.onmouseleave = () => productCard.style.transform = 'translateY(0)';
+        
+        // Get first image if available
+        const imageUrl = product.images && product.images.length > 0 ? product.images[0] : '';
+        
         productCard.innerHTML = `
-            <div class="product-info">
-                <h4 style="font-size: 14px; margin: 0 0 8px 0; color: #111827;">${product.name}</h4>
-                <p style="font-size: 12px; color: #6b7280; margin: 4px 0;">${product.color}</p>
-                <p style="font-size: 16px; font-weight: 600; color: #059669; margin: 8px 0;">£${product.price}</p>
-                <a href="${product.url}" target="_blank" style="font-size: 13px; color: #2563eb; text-decoration: none;">View Product →</a>
+            ${imageUrl ? `
+                <div style="width: 100%; height: 200px; overflow: hidden; background: #f3f4f6;">
+                    <img src="${imageUrl}" 
+                         alt="${product.name}" 
+                         style="width: 100%; height: 100%; object-fit: cover;"
+                         onerror="this.style.display='none'; this.parentElement.innerHTML='<div style=\\'display:flex;align-items:center;justify-content:center;height:100%;color:#9ca3af;\\'>No Image</div>'">
+                </div>
+            ` : ''}
+            <div class="product-info" style="padding: 15px;">
+                <h4 style="font-size: 14px; margin: 0 0 8px 0; color: #111827; font-weight: 600;">${product.name}</h4>
+                <p style="font-size: 12px; color: #6b7280; margin: 4px 0;">
+                    <span style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: ${getColorCode(product.color)}; margin-right: 6px; vertical-align: middle;"></span>
+                    ${product.color}
+                </p>
+                <p style="font-size: 18px; font-weight: 700; color: #059669; margin: 12px 0 8px 0;">£${product.price}</p>
+                <a href="${product.url}" target="_blank" 
+                   style="display: inline-block; font-size: 13px; color: #ffffff; background: #2563eb; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: 500; transition: background 0.2s;"
+                   onmouseover="this.style.background='#1d4ed8'"
+                   onmouseout="this.style.background='#2563eb'">
+                    View Product →
+                </a>
             </div>
         `;
         productContainer.appendChild(productCard);
@@ -251,6 +291,34 @@ function displayProducts(products) {
     
     elements.messages.appendChild(productContainer);
     scrollToBottom();
+}
+
+// Helper function to get color code approximation
+function getColorCode(colorName) {
+    const colorMap = {
+        'black': '#000000',
+        'white': '#ffffff',
+        'red': '#ef4444',
+        'blue': '#3b82f6',
+        'green': '#10b981',
+        'yellow': '#fbbf24',
+        'pink': '#ec4899',
+        'purple': '#a855f7',
+        'brown': '#92400e',
+        'grey': '#6b7280',
+        'gray': '#6b7280',
+        'orange': '#f97316',
+        'beige': '#d4c5b9',
+        'navy': '#1e3a8a'
+    };
+    
+    const lowerColor = colorName.toLowerCase();
+    for (const [key, value] of Object.entries(colorMap)) {
+        if (lowerColor.includes(key)) {
+            return value;
+        }
+    }
+    return '#9ca3af'; // Default gray
 }
 
 // ==================== CHAT HISTORY ====================
@@ -322,10 +390,13 @@ function loadChat(chatId) {
     renderChatHistory();
 }
 
-function startNewChat() {
+async function startNewChat() {
     currentChatId = null;
     elements.messages.innerHTML = '';
     elements.welcomeScreen.classList.remove('hidden');
+
+    // Reset conversation history on backend
+    await resetConversationHistory();
 
     // Remove active state from all history items
     document.querySelectorAll('.history-item').forEach(item => {
@@ -333,10 +404,29 @@ function startNewChat() {
     });
 }
 
+async function resetConversationHistory() {
+    try {
+        await fetch('http://localhost:5000/api/reset', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            credentials: 'include',
+            body: JSON.stringify({ 
+                session_id: sessionId 
+            })
+        });
+        console.log('Conversation history reset on backend');
+    } catch (error) {
+        console.error('Error resetting conversation:', error);
+    }
+}
+
 function clearAllHistory() {
     if (confirm('Are you sure you want to clear all chat history? This cannot be undone.')) {
         chatHistory = [];
         localStorage.removeItem('chatHistory');
+        resetConversationHistory();
         startNewChat();
         renderChatHistory();
     }

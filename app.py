@@ -2,10 +2,12 @@
 Flask API Backend for ChicBot UI
 Connects the web interface to the chatbot pipeline
 """
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, session
 from flask_cors import CORS
 import sys
+import uuid
 from pathlib import Path
+from datetime import timedelta
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / 'src'))
@@ -13,13 +15,23 @@ sys.path.insert(0, str(Path(__file__).parent / 'src'))
 from chatbot_pipeline import ChatbotPipeline
 
 app = Flask(__name__, static_folder='UI', static_url_path='')
-CORS(app)
+app.config['SECRET_KEY'] = 'chicbot-secret-key-' + str(uuid.uuid4())
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=2)
+CORS(app, supports_credentials=True)
 
-# Initialize chatbot pipeline
-print("Initializing ChicBot...")
-pipeline = ChatbotPipeline()
-pipeline.load_models()
-print("ChicBot ready!")
+# Store pipelines per session (in-memory for simplicity)
+# In production, use Redis or database
+session_pipelines = {}
+
+def get_or_create_pipeline(session_id):
+    """Get existing pipeline for session or create new one"""
+    if session_id not in session_pipelines:
+        print(f"Creating new pipeline for session {session_id[:8]}...")
+        pipeline = ChatbotPipeline()
+        pipeline.load_models()
+        session_pipelines[session_id] = pipeline
+    return session_pipelines[session_id]
 
 
 @app.route('/')
@@ -31,11 +43,12 @@ def index():
 @app.route('/api/chat', methods=['POST'])
 def chat():
     """
-    Handle chat messages from UI
+    Handle chat messages from UI with session-based conversation history
     
     Expected JSON:
     {
-        "message": "user message text"
+        "message": "user message text",
+        "session_id": "optional-session-id"
     }
     
     Returns:
@@ -54,6 +67,16 @@ def chat():
                 'error': 'Message cannot be empty'
             }), 400
         
+        # Get or create session ID
+        session_id = data.get('session_id') or session.get('session_id')
+        if not session_id:
+            session_id = str(uuid.uuid4())
+            session['session_id'] = session_id
+            session.permanent = True
+        
+        # Get pipeline for this session (maintains conversation history)
+        pipeline = get_or_create_pipeline(session_id)
+        
         # Process message through pipeline
         result = pipeline.process_message(user_message)
         
@@ -69,16 +92,18 @@ def chat():
                 }
             })
         
-        # Return successful response
+        # Return successful response with session info
         return jsonify({
             'response': result.get('response', 'I found some products for you!'),
             'products': result.get('products', [])[:3],  # Limit to top 3 for UI
+            'session_id': session_id,
             'metadata': {
                 'detected_language': result.get('detected_language'),
                 'language_confidence': result.get('language_confidence'),
                 'intent': result.get('intent'),
                 'query_english': result.get('query_english'),
-                'total_products': len(result.get('products', []))
+                'total_products': len(result.get('products', [])),
+                'conversation_turns': len(pipeline.conversation_history)
             }
         })
         
@@ -90,12 +115,37 @@ def chat():
         }), 500
 
 
+@app.route('/api/reset', methods=['POST'])
+def reset_conversation():
+    """Reset conversation history for current session"""
+    try:
+        data = request.get_json() or {}
+        session_id = data.get('session_id') or session.get('session_id')
+        
+        if session_id and session_id in session_pipelines:
+            session_pipelines[session_id].conversation_history = []
+            return jsonify({
+                'status': 'success',
+                'message': 'Conversation history reset'
+            })
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'No active conversation to reset'
+        })
+    except Exception as e:
+        return jsonify({
+            'error': str(e)
+        }), 500
+
+
 @app.route('/api/health', methods=['GET'])
 def health():
     """Health check endpoint"""
     return jsonify({
         'status': 'healthy',
-        'message': 'ChicBot API is running'
+        'message': 'ChicBot API is running',
+        'active_sessions': len(session_pipelines)
     })
 
 
