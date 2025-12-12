@@ -266,24 +266,15 @@ class ChatbotPipeline:
         intent = intent_result['intent']
         intent_confidence = intent_result['confidence']
         
-        print(f"    Intent: {intent} (confidence: {intent_confidence:.2f})")
+        print(f"    DistilBERT Intent: {intent} (confidence: {intent_confidence:.2f})")
         
-        # Determine rejection threshold based on conversation history
-        if self.conversation_history:
-            # For follow-ups, accept if confidence < 1.0 (i.e., any uncertainty = accept)
-            # Only reject if 100% certain it's out-of-context
-            rejection_threshold = 0.995
-        else:
-            # For new conversations, use strict threshold
-            rejection_threshold = 0.75
-        
-        # Reject out-of-context queries
-        if intent == 'out_of_context' and intent_confidence > rejection_threshold:
+        # If DistilBERT rejects, reject immediately (no need for Gemini)
+        if intent == 'out_of_context':
             print("    ⚠️  Out-of-context query detected - rejecting")
             return {
                 'status': 'rejected',
                 'reason': 'out_of_context',
-                'message': 'I can only help with shopping and product recommendations. What product are you looking for?',
+                'message': 'I can help with fashion products. What item are you looking for?',
                 'detected_language': detected_lang,
                 'language_confidence': confidence,
                 'intent': intent,
@@ -292,17 +283,37 @@ class ChatbotPipeline:
                 'original_query': user_input
             }
         
-        # Step 2.75: Enrich query with context (rule-based for now, Gemini optional)
-        print("\n[2.75] Enriching query with context...")
+        # Step 2.75: DistilBERT said in_context, now validate with Gemini
+        print("\n[2.75] Extracting entities and validating context with Gemini...")
         
-        # Try Gemini entity extraction first (if available)
+        # Try Gemini entity extraction (if available)
         entities = self._extract_entities(query_english) if self.entity_extractor else {}
         
-        if entities and (entities.get('product_type') or entities.get('colors') or entities.get('features')):
+        # Gemini double-check: both DistilBERT and Gemini must agree it's fashion
+        if entities and entities.get('is_fashion_query') is False:
+            print("    ⚠️  DistilBERT said in_context, but Gemini says NOT fashion - rejecting")
+            return {
+                'status': 'rejected',
+                'reason': 'not_fashion',
+                'message': 'I can help with fashion products. What item are you looking for?',
+                'detected_language': detected_lang,
+                'language_confidence': confidence,
+                'intent': 'out_of_context',
+                'intent_confidence': intent_confidence,
+                'query_english': query_english,
+                'original_query': user_input
+            }
+        
+        if entities and entities.get('is_fashion_query') is True:
+            print(f"    ✓ Gemini confirmed: fashion query")
+        
+        if entities and (entities.get('product_type') or entities.get('colors') or entities.get('features') or entities.get('materials')):
             # Gemini successfully extracted entities - use them
             parts = []
             if entities.get('colors'):
                 parts.extend(entities['colors'])
+            if entities.get('materials'):
+                parts.extend(entities['materials'])
             if entities.get('product_type'):
                 parts.append(entities['product_type'])
             if entities.get('brand'):
@@ -310,7 +321,7 @@ class ChatbotPipeline:
             
             search_query = " ".join(parts)
             print(f"    ✓ Entity-based query (Gemini): '{search_query}'")
-            print(f"    📦 Entities: product_type={entities.get('product_type')}, colors={entities.get('colors')}, brand={entities.get('brand')}, features={entities.get('features')}")
+            print(f"    📦 Entities: product_type={entities.get('product_type')}, materials={entities.get('materials')}, colors={entities.get('colors')}, brand={entities.get('brand')}, features={entities.get('features')}")
             
         else:
             # Use rule-based enrichment (reliable fallback)
@@ -323,6 +334,7 @@ class ChatbotPipeline:
         filters = {
             'product_type': entities.get('product_type') if entities else None,
             'colors': entities.get('colors') if entities else None,
+            'materials': entities.get('materials') if entities else None,
             'brand': entities.get('brand') if entities else None,
             'price_min': entities.get('price_min') if entities else None,
             'price_max': entities.get('price_max') if entities else None,
@@ -357,10 +369,11 @@ class ChatbotPipeline:
             'response': response
         }
         
-        # Add to conversation history (store enriched query for better context)
+        # Add to conversation history (store enriched query + entities for better context)
         self.conversation_history.append({
             'user': user_input,
             'query_english': search_query,  # Store enriched query, not original
+            'entities': entities,  # Store extracted entities for context merging
             'response': response,
             'products': [p['name'] for p in products[:3]] if products else [],
             'language': detected_lang

@@ -12,11 +12,15 @@ class ProductEntities(BaseModel):
     """Extracted product entities from user query."""
     
     product_type: Optional[str] = Field(
-        description="The type of product being requested (e.g., 'dress', 'jeans', 'jacket'). Normalized to singular."
+        description="The type of product (e.g., 'dress', 'trousers', 'jacket', 'coat', 'shirt', 'skirt'). NOT materials like 'denim', 'leather'. Singular form."
+    )
+    materials: List[str] = Field(
+        default=[],
+        description="Material/fabric types (e.g., 'denim', 'leather', 'cotton', 'silk', 'wool', 'suede'). Lowercase."
     )
     colors: List[str] = Field(
         default=[],
-        description="List of colors mentioned (e.g., ['blue', 'navy']). Normalized to lowercase."
+        description="Color attributes (e.g., ['black', 'red', 'navy blue']). Lowercase."
     )
     price_min: Optional[float] = Field(
         description="Minimum price budget if specified."
@@ -26,20 +30,23 @@ class ProductEntities(BaseModel):
     )
     sizes: List[str] = Field(
         default=[],
-        description="Sizes requested (e.g., ['M', 'L', '42'])."
+        description="Size specifications (e.g., ['M', 'L', '42'])."
     )
     gender: Optional[str] = Field(
-        description="Target gender if specified (e.g., 'women', 'men')."
+        description="Target gender (e.g., 'women', 'men', 'unisex')."
     )
     brand: Optional[str] = Field(
-        description="Brand name if specified (e.g., 'Nike', 'Adidas')."
+        description="Brand name (e.g., 'Nike', 'Adidas', 'Tommy Jeans')."
     )
     features: List[str] = Field(
         default=[],
-        description="Style/feature constraints like 'short sleeve', 'long sleeve', 'sleeveless', 'v neck', 'midi', 'mini', 'maxi', 'slim fit', 'oversized'. Lowercase phrases."
+        description="Style/design features: 'short sleeve', 'long sleeve', 'sleeveless', 'v neck', 'midi', 'mini', 'maxi', 'slim fit', 'oversized', 'hooded', 'cropped', 'embroidered'. Lowercase phrases."
     )
     sort_by: Optional[str] = Field(
-        description="Sorting preference: 'price_asc', 'price_desc', 'newest'."
+        description="Sort preference: 'price_asc', 'price_desc', 'newest'."
+    )
+    is_fashion_query: bool = Field(
+        description="True if query is about fashion/clothing shopping, False otherwise (food, electronics, general chat)."
     )
 
 class GeminiEntityExtractor:
@@ -76,31 +83,74 @@ class GeminiEntityExtractor:
         if not self.runnable:
             return {}
 
-        # Construct context string
+        # Construct context string with previous entities
         context_str = ""
+        previous_entities = None
+        
         if conversation_history:
-            last_exchanges = conversation_history[-3:] # Last 3 turns
+            last_exchanges = conversation_history[-3:]
             context_str = "\nConversation History:\n"
             for turn in last_exchanges:
-                context_str += f"User: {turn.get('user', '')}\nBot: {turn.get('response', '')}\n"
+                context_str += f"User: {turn.get('user', '')}\n"
+                if turn.get('entities'):
+                    previous_entities = turn.get('entities')
 
         prompt = f"""
-        You are an expert e-commerce shopping assistant.
-        Extract structured product attributes from the latest user query.
-        Capture style constraints such as sleeve length (short sleeve, long sleeve, sleeveless), dress length (mini, midi, maxi), neckline (v neck), and fit (slim, oversized) inside `features` as lowercase phrases.
-        
-        {context_str}
-        
-        Current User Query: "{query}"
-        
-        Extract the attributes into the defined JSON structure.
-        If the user is waiting for a response to a previous question, or acknowledging, exact attributes might be empty.
-        If the user adds constraints (e.g. "make it blue"), merge with context implicitly.
+You are an expert fashion e-commerce assistant. Extract structured product attributes from the user query.
+
+CRITICAL DISTINCTIONS:
+1. **Product Types** (what item): dress, trousers, jacket, coat, shirt, skirt, shoes, bag
+2. **Materials** (what fabric): denim, leather, cotton, silk, wool, suede, linen
+3. **Colors** (what color): black, red, blue, white, navy, pink
+4. **Features** (style details): short sleeve, long sleeve, midi, mini, hooded, cropped
+
+EXAMPLES:
+- "black denim jacket" → product_type='jacket', materials=['denim'], colors=['black']
+- "red leather shoes" → product_type='shoes', materials=['leather'], colors=['red']
+- "jeans" → materials=['denim'], product_type=use context or leave None
+- "trousers" → product_type='trousers'
+- "black" → colors=['black'], inherit product_type/materials from context
+
+CONTEXT HANDLING:
+If user says just a material/color/feature, they're refining the previous search:
+- Previous: product_type='trousers' → User: "jeans" → product_type='trousers', materials=['denim']
+- Previous: product_type='dress' → User: "red" → product_type='dress', colors=['red']
+- Previous: product_type='jacket' → User: "leather" → product_type='jacket', materials=['leather']
+
+VALIDATION:
+- Set `is_fashion_query=True` ONLY for fashion shopping (clothing, shoes, accessories)
+- Set `is_fashion_query=False` for food, electronics, services, personal questions
+
+{context_str}
+
+Current Query: "{query}"
+
+Extract attributes. If user is refining previous search, merge with context appropriately.
         """
         
         try:
             result: ProductEntities = self.runnable.invoke(prompt)
-            return result.dict()
+            extracted = result.dict()
+            
+            # Merge with previous context if current query is refinement
+            if previous_entities and conversation_history:
+                # If no product_type extracted, inherit from previous
+                if not extracted.get('product_type') and previous_entities.get('product_type'):
+                    extracted['product_type'] = previous_entities['product_type']
+                    
+                # Merge materials if both exist
+                if previous_entities.get('materials'):
+                    prev_materials = set(previous_entities['materials'])
+                    curr_materials = set(extracted.get('materials', []))
+                    extracted['materials'] = list(prev_materials | curr_materials)
+                
+                # Merge colors if both exist
+                if previous_entities.get('colors'):
+                    prev_colors = set(previous_entities['colors'])
+                    curr_colors = set(extracted.get('colors', []))
+                    extracted['colors'] = list(prev_colors | curr_colors)
+            
+            return extracted
         except Exception as e:
             print(f"❌ Entity extraction failed: {e}")
             return {}

@@ -85,6 +85,14 @@ class ProductSearch:
         else:
             filter_features = []
         
+        raw_materials = filters.get('materials')
+        if isinstance(raw_materials, str):
+            filter_materials = [raw_materials.lower()]
+        elif isinstance(raw_materials, list):
+            filter_materials = [m.lower() for m in raw_materials]
+        else:
+            filter_materials = []
+        
         df_filtered = self.df
 
         if filter_product_type:
@@ -94,6 +102,18 @@ class ProductSearch:
                 df_filtered['category_clean'].fillna('').str.lower().str.contains(pt) |
                 df_filtered['category'].fillna('').str.lower().str.contains(pt)
             ]
+
+        if filter_materials:
+            mat_mask = pd.Series([False] * len(df_filtered), index=df_filtered.index)
+            for material in filter_materials:
+                kw = material.lower().strip()
+                mat_mask = mat_mask | (
+                    df_filtered['name'].fillna('').str.lower().apply(lambda t: has_word(t, kw)) |
+                    df_filtered['category_clean'].fillna('').str.lower().apply(lambda t: has_word(t, kw)) |
+                    df_filtered['category'].fillna('').str.lower().apply(lambda t: has_word(t, kw)) |
+                    df_filtered['description'].fillna('').str.lower().apply(lambda t: has_word(t, kw))
+                )
+            df_filtered = df_filtered[mat_mask]
 
         if filter_colors:
             mask = pd.Series([False] * len(df_filtered), index=df_filtered.index)
@@ -191,6 +211,16 @@ class ProductSearch:
 
                 if in_name and not is_multicolored:
                     score += 5
+
+            active_materials = filter_materials
+            for material in active_materials:
+                in_name = has_word(name, material)
+                in_cat = has_word(category, material)
+                in_desc = has_word(description, material)
+                if in_name or in_cat:
+                    score += 8  # Material match is important
+                elif in_desc:
+                    score += 4
 
             active_features = filter_features
             for feat in active_features:
