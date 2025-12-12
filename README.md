@@ -1,203 +1,295 @@
-<<<<<<< HEAD
-=======
-# Multilingual Chatbot - Language Detection
+# ChicBot - Multilingual Fashion E-Commerce Chatbot 🛍️
 
-XLM-RoBERTa-based language detection for a fashion e-commerce chatbot supporting 5 languages including Tunisian dialect.
+An intelligent, multilingual conversational AI chatbot for fashion e-commerce, supporting English, French, Arabic, and Tunisian dialect. Built with transformer-based models and powered by Google Gemini for natural language understanding.
 
-## Languages Supported
+## ✨ Features
 
-- **English (en)**: Standard English
-- **French (fr)**: Standard French
-- **Standard Arabic (ar)**: Modern Standard Arabic
-- **Tunisian Latin (tn_latn)**: Tunisian dialect in Latin script (e.g., "na7eb nechri jacket")
-- **Tunisian Arabic (tn_arab)**: Tunisian dialect in Arabic script (e.g., "نحب نشري جاكيت")
+- **🌍 Multilingual Support**: 4 languages (English, French, Arabic, Tunisian Latin)
+- **🧠 Smart Intent Classification**: Two-layer validation with DistilBERT + Gemini
+- **🔍 Advanced Product Search**: Context-aware search with material, color, and feature filtering
+- **💬 Conversation Context**: Tracks conversation history for follow-up queries
+- **🎯 Entity Extraction**: Distinguishes product types, materials, colors, brands, sizes, and features
+- **⚡ Real-time Translation**: Seamless translation between languages using Gemini
+- **🎨 Modern Web UI**: Clean, responsive chat interface
 
-## Project Structure
+## 🏗️ Architecture
+
+### Core Components
+
+1. **Language Detection** (XLM-RoBERTa)
+   - Detects user language with high accuracy
+   - Supports code-switching
+
+2. **Intent Classification** (DistilBERT)
+   - Binary classification: in_context (shopping) / out_of_context
+   - Fast first-layer validation
+
+3. **Entity Extraction** (Gemini 2.5 Flash)
+   - Structured output with Pydantic schemas
+   - Extracts: product_type, materials, colors, brand, price, sizes, features
+   - Context-aware refinement across conversation turns
+
+4. **Product Search Engine**
+   - Semantic scoring with multiple factors
+   - Pre-filtering by attributes before scoring
+   - Word-boundary matching to prevent false positives
+   - Material filtering (denim, leather, cotton, etc.)
+
+5. **Response Generation** (Gemini 2.5 Flash)
+   - Natural language responses in user's language
+   - Personalized product recommendations
+
+## 📁 Project Structure
 
 ```
 commercial-chatbot/
 ├── data/
-│   ├── products_asos.csv                    # Original product data
-│   ├── products_asos_cleaned.csv           # Cleaned product data
-│   ├── raw/                                 # Legacy raw data
-│   ├── processed/                           # Legacy processed data
-│   └── language_detection/                  # Language detection datasets
-│       ├── raw/                             # Per-language JSON files
-│       │   ├── en.json
-│       │   ├── fr.json
-│       │   ├── ar.json
-│       │   ├── tn_latn.json
-│       │   └── tn_arab.json
-│       ├── generated/                       # Combined datasets
-│       │   └── combined_dataset.json
+│   ├── products/
+│   │   └── products_asos_enhanced.csv       # 30,501 ASOS products
+│   ├── language_detection/                  # Language detection datasets
+│   │   ├── raw/                             # Per-language JSON files
+│   │   ├── generated/                       # Combined datasets
+│   │   └── splits/                          # Train/val/test splits
+│   └── intent_classification/               # Intent classification datasets
+│       ├── raw/                             # Raw training data
 │       └── splits/                          # Train/val/test splits
-│           ├── train.json                   # 70% (14,332 samples)
-│           ├── val.json                     # 15% (3,071 samples)
-│           └── test.json                    # 15% (3,072 samples)
 ├── src/
-│   ├── data/
-│   │   ├── generators/                      # Dataset generation
-│   │   │   ├── generator.py                 # Main generator
-│   │   │   ├── templates.py                 # Language templates
-│   │   │   ├── vocabulary.py                # Product vocabulary
-│   │   │   └── code_switching.py            # Code-switching patterns
-│   │   └── preprocessing/                   # Data preprocessing
-│   │       ├── split_dataset.py             # Dataset splitting
-│   │       ├── dataset.py                   # PyTorch datasets
-│   │       └── data_loaders.py              # Data loaders
+│   ├── chatbot_pipeline.py                  # Main orchestration pipeline
+│   ├── language_detector.py                 # XLM-RoBERTa language detection
+│   ├── intent_classifier.py                 # DistilBERT intent classification
+│   ├── entity_extractor.py                  # Gemini entity extraction
+│   ├── product_search.py                    # Product search engine
+│   ├── translator.py                        # Gemini translation
+│   ├── response_generator.py                # Gemini response generation
 │   ├── models/                              # Model implementations
-│   ├── training/                            # Training utilities
-│   ├── evaluation/                          # Evaluation utilities
-│   └── utils/                               # General utilities
-├── scripts/
-│   └── data_generation/
-│       └── generate_dataset.py              # Dataset generation script
-├── notebooks/
-│   ├── 01_data_exploration.ipynb            # Product data EDA
-│   ├── 02_data_cleaning.ipynb               # Product data cleaning
-│   └── 03_product_classifier_training.ipynb # Keyword-based classifier
-├── ui/                                      # Web interface
-│   ├── chat.html
+│   ├── preprocessing/                       # Data preprocessing
+│   └── training/                            # Training utilities
+├── experiments/
+│   ├── xlm_roberta_run2/                    # Language detection model
+│   │   └── best_model.pt
+│   └── DistelBert/                          # Intent classification model
+│       └── best_model.pt
+├── UI/
+│   ├── index.html                           # Web interface
 │   ├── styles.css
 │   └── script.js
-├── configs/                                 # Configuration files
-├── experiments/                             # Experiment tracking
+├── app.py                                   # Flask API server
 ├── requirements.txt
 └── README.md
 ```
 
-## Setup
+## 🚀 Quick Start
 
-### 1. Create Virtual Environment
+### Prerequisites
 
+- Python 3.8+
+- Google Gemini API key ([Get one here](https://ai.google.dev/))
+
+### Installation
+
+1. **Clone the repository**
 ```bash
-python3 -m venv venv
-source venv/bin/activate
+git clone https://github.com/Yassiine20/commercial-chatbot.git
+cd commercial-chatbot
 ```
 
-### 2. Install Dependencies
+2. **Create virtual environment**
+```bash
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
 
+3. **Install dependencies**
 ```bash
 pip install -r requirements.txt
 ```
 
-## Usage
+4. **Set up environment variables**
+```bash
+cp .env.example .env
+# Edit .env and add your GEMINI_API_KEY
+```
 
-### Step 1: Generate Dataset
+5. **Run the application**
+```bash
+python app.py
+```
 
-Generate 20,475 synthetic samples across 5 languages:
+6. **Open in browser**
+```
+http://localhost:5000
+```
+
+## 💡 Usage Examples
+
+### Basic Product Search
+```
+User: "I want a black dress"
+Bot: Shows 5 black dresses with images and prices
+```
+
+### Material Refinement
+```
+User: "is there any trousers?"
+Bot: Shows trouser options
+
+User: "jeans"
+Bot: Shows denim trousers specifically
+```
+
+### Color & Feature Filtering
+```
+User: "red dresses"
+Bot: Shows red dresses
+
+User: "short sleeve"
+Bot: Shows red dresses with short sleeves
+```
+
+### Multilingual Queries
+```
+User: "na7eb nechri kabbout k7el"  (Tunisian)
+Bot: Translates to "I want to buy a black jacket" and shows results
+
+User: "Je veux une robe rouge"  (French)
+Bot: Shows red dresses
+
+User: "أريد جاكيت أسود"  (Arabic)
+Bot: Shows black jackets
+```
+
+## 🎯 Key Features Explained
+
+### 1. Entity Extraction Schema
+
+The chatbot extracts structured entities from queries:
+
+```python
+{
+  "product_type": "dress",           # dress, jacket, trousers, etc.
+  "materials": ["denim", "leather"], # fabric/material types
+  "colors": ["black", "red"],        # color attributes
+  "brand": "Nike",                   # brand name
+  "price_min": 20.0,                 # minimum price
+  "price_max": 50.0,                 # maximum price
+  "sizes": ["M", "L"],               # size specifications
+  "features": ["short sleeve"],      # style features
+  "sort_by": "price_asc",            # sorting preference
+  "is_fashion_query": true           # validation flag
+}
+```
+
+### 2. Context-Aware Refinement
+
+The chatbot remembers conversation context:
+
+```
+User: "trousers"
+Entities: {product_type: "trousers"}
+
+User: "black"
+Entities: {product_type: "trousers", colors: ["black"]}  # Inherits context
+
+User: "jeans"
+Entities: {product_type: "trousers", materials: ["denim"], colors: ["black"]}
+```
+
+### 3. Two-Layer Validation
+
+Prevents non-fashion queries from reaching the search engine:
+
+1. **Layer 1 (DistilBERT)**: Fast rejection of obvious non-fashion queries
+2. **Layer 2 (Gemini)**: Validates ambiguous cases
+
+```
+Query: "What's the weather?"
+DistilBERT: out_of_context → REJECTED
+
+Query: "bread"
+DistilBERT: in_context (0.75)
+Gemini: is_fashion_query = False → REJECTED
+
+Query: "black dress"
+DistilBERT: in_context (0.99)
+Gemini: is_fashion_query = True → PROCEED
+```
+
+## 🛠️ Configuration
+
+### Environment Variables
 
 ```bash
-python3 scripts/data_generation/generate_dataset.py
+GEMINI_API_KEY=your_api_key_here
 ```
 
-**Options:**
+### Model Checkpoints
 
-- `--seed`: Random seed (default: 42)
-- `--output-dir`: Output directory (default: data/language_detection/generated)
+Place trained model checkpoints in:
+- `experiments/xlm_roberta_run2/best_model.pt` - Language detection
+- `experiments/DistelBert/best_model.pt` - Intent classification
 
-**Output:**
+## 📊 Dataset
 
-- `data/language_detection/generated/combined_dataset.json`: All samples combined
-- `data/language_detection/raw/<language>.json`: Per-language files
+### ASOS Product Catalog
 
-**Dataset Statistics:**
+- **Size**: 30,501 products
+- **Fields**: name, category, color, price, SKU, description, images, brand, sizes, materials
+- **Categories**: Dresses, jackets, trousers, shoes, accessories, etc.
 
-- Total samples: 20,475
-- Samples per language: ~3,500 (regular) + code-switched samples
-- Code-switching: ~17% of samples
-- Length distribution: 30% short, 50% medium, 20% long
+### Training Data
 
-### Step 2: Split Dataset
+1. **Language Detection**: 20,475 samples across 4 languages
+2. **Intent Classification**: Binary classification (in_context/out_of_context)
 
-Split the dataset into train/validation/test sets (70/15/15):
+## 🧪 Testing
+
+Run the chatbot in test mode:
 
 ```bash
-python3 src/data/preprocessing/split_dataset.py
+python src/chatbot_pipeline.py
 ```
 
-**Options:**
+Test with sample queries:
+- "I want a black jacket"
+- "Je veux un pull noir"
+- "na7eb nechri jacket ka7la"
+- "أريد شراء جاكيت أسود"
 
-- `--input`: Input dataset (default: data/language_detection/generated/combined_dataset.json)
-- `--output-dir`: Output directory (default: data/language_detection/splits)
-- `--seed`: Random seed (default: 42)
+## 🎨 Web Interface
 
-**Output:**
+The UI provides:
+- Clean chat interface with message bubbles
+- Product cards with images and prices
+- "View Product" buttons linking to ASOS
+- Conversation history
+- Language auto-detection indicator
 
-- `data/language_detection/splits/train.json`: 14,332 samples (70%)
-- `data/language_detection/splits/val.json`: 3,071 samples (15%)
-- `data/language_detection/splits/test.json`: 3,072 samples (15%)
+## 🤝 Contributing
 
-**Stratified Splitting:**
-Each split maintains the same language distribution as the original dataset.
+Contributions welcome! Please follow these steps:
 
-## Dataset Details
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-### Code-Switching
+## 📝 License
 
-The dataset includes realistic code-switching patterns common in multilingual contexts:
+This project is licensed under the MIT License.
 
-- **Tunisian + English**: "salam, I want jacket"
-- **Tunisian + French**: "b9adech le bomber?"
-- **Arabic + French**: "مرحبا, je veux veste"
+## 🙏 Acknowledgments
 
-Code-switched samples are labeled by their dominant language.
+- **ASOS** for product data
+- **Google Gemini** for LLM capabilities
+- **Hugging Face** for transformer models
+- **XLM-RoBERTa** for multilingual understanding
+- **DistilBERT** for efficient intent classification
 
-### Sample Examples
+## 📧 Contact
 
-**English:**
+For questions or support, please open an issue on GitHub.
 
-```
-"I want to buy a black bomber jacket in size L"
-"Do you have this jacket in size M?"
-```
+---
 
-**French:**
-
-```
-"Je veux acheter un manteau noir en taille L"
-"Vous avez cette veste en taille M?"
-```
-
-**Standard Arabic:**
-
-```
-"أريد شراء جاكيت أسود بمقاس L"
-"هل لديكم هذا الجاكيت بمقاس M؟"
-```
-
-**Tunisian Latin:**
-
-```
-"na7eb nechri kabbout k7el taille L"
-"3andkom jacket fi taille M?"
-```
-
-**Tunisian Arabic:**
-
-```
-"نحب نشري كبوط كحل تاي L"
-"عندكم جاكيت في تاي M؟"
-```
-
-## Next Steps
-
-- [ ] Create PyTorch Dataset class
-- [ ] Implement XLM-RoBERTa training script
-- [ ] Train the model
-- [ ] Evaluate performance
-- [ ] Deploy for inference
-
-## Model Architecture
-
-**Base Model:** XLM-RoBERTa-base
-
-- Pre-trained on 100 languages
-- Handles multilingual text natively
-- Supports mixed scripts (Latin + Arabic)
-
-**Task:** 5-class classification
-
-- Input: User message text
-- Output: Language label (en, fr, ar, tn_latn, tn_arab)
->>>>>>> training
+**Built with ❤️ for multilingual fashion e-commerce**
