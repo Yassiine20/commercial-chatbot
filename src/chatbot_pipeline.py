@@ -16,6 +16,7 @@ from translator import GeminiTranslator
 from intent_classifier import IntentClassifier
 from product_search import ProductSearch
 from response_generator import ResponseGenerator
+from entity_extractor import GeminiEntityExtractor
 
 # Load environment variables
 load_dotenv()
@@ -28,6 +29,7 @@ class ChatbotPipeline:
         self.language_detector = None
         self.translator = None
         self.intent_classifier = None
+        self.entity_extractor = None
         self.product_search = None
         self.response_generator = None
         self.conversation_history = []
@@ -60,6 +62,10 @@ class ChatbotPipeline:
             device='cpu'
         )
         print("✓ Intent classifier loaded (binary: in_context/out_of_context)")
+
+        # Entity Extractor
+        self.entity_extractor = GeminiEntityExtractor()
+        print("✓ Entity extractor initialized")
 
         # Product search engine
         self.product_search = ProductSearch()
@@ -190,9 +196,15 @@ class ChatbotPipeline:
         
         return query
 
-    def _search_products(self, query: str, max_results: int = 5) -> List[Dict]:
+    def _extract_entities(self, query: str) -> Dict:
+        """Extract structured entities from query using Gemini."""
+        if not self.entity_extractor:
+            return {}
+        return self.entity_extractor.extract(query, self.conversation_history)
+
+    def _search_products(self, query: str, max_results: int = 5, filters: Dict = None, sort_by: str = "relevance") -> List[Dict]:
         """Search catalog for products matching the query."""
-        return self.product_search.search(query, max_results=max_results)
+        return self.product_search.search(query, max_results=max_results, filters=filters, sort_by=sort_by)
 
     def _generate_response(self, products: List[Dict], language: str, query_english: str, conversation_history: List[Dict] = None) -> str:
         """Generate a natural-language reply based on search results."""
@@ -249,19 +261,24 @@ class ChatbotPipeline:
         # Step 2.5: Check if query is in-context (shopping-related)
         print("\n[2.5] Checking intent...")
         
-        # If there's conversation history, assume follow-up is in-context
-        if self.conversation_history:
-            print("    💬 Conversation history detected - treating as follow-up question (in_context)")
-            intent = 'in_context'
-            intent_confidence = 1.0
-        else:
-            intent_result = self._classify_intent(query_english)
-            intent = intent_result['intent']
-            intent_confidence = intent_result['confidence']
-            print(f"    Intent: {intent} (confidence: {intent_confidence:.2f})")
+        # Always use intent classifier to maintain quality
+        intent_result = self._classify_intent(query_english)
+        intent = intent_result['intent']
+        intent_confidence = intent_result['confidence']
         
-        # Reject out-of-context queries (only for new conversations)
-        if intent == 'out_of_context' and intent_confidence > 0.75 and not self.conversation_history:
+        print(f"    Intent: {intent} (confidence: {intent_confidence:.2f})")
+        
+        # Determine rejection threshold based on conversation history
+        if self.conversation_history:
+            # For follow-ups, accept if confidence < 1.0 (i.e., any uncertainty = accept)
+            # Only reject if 100% certain it's out-of-context
+            rejection_threshold = 0.995
+        else:
+            # For new conversations, use strict threshold
+            rejection_threshold = 0.75
+        
+        # Reject out-of-context queries
+        if intent == 'out_of_context' and intent_confidence > rejection_threshold:
             print("    ⚠️  Out-of-context query detected - rejecting")
             return {
                 'status': 'rejected',
@@ -275,12 +292,46 @@ class ChatbotPipeline:
                 'original_query': user_input
             }
         
-        # Step 2.75: Enrich query with conversation context
-        enriched_query = self._enrich_query_with_context(query_english, self.conversation_history)
+        # Step 2.75: Enrich query with context (rule-based for now, Gemini optional)
+        print("\n[2.75] Enriching query with context...")
+        
+        # Try Gemini entity extraction first (if available)
+        entities = self._extract_entities(query_english) if self.entity_extractor else {}
+        
+        if entities and (entities.get('product_type') or entities.get('colors') or entities.get('features')):
+            # Gemini successfully extracted entities - use them
+            parts = []
+            if entities.get('colors'):
+                parts.extend(entities['colors'])
+            if entities.get('product_type'):
+                parts.append(entities['product_type'])
+            if entities.get('brand'):
+                parts.append(entities['brand'])
+            
+            search_query = " ".join(parts)
+            print(f"    ✓ Entity-based query (Gemini): '{search_query}'")
+            print(f"    📦 Entities: product_type={entities.get('product_type')}, colors={entities.get('colors')}, brand={entities.get('brand')}, features={entities.get('features')}")
+            
+        else:
+            # Use rule-based enrichment (reliable fallback)
+            search_query = self._enrich_query_with_context(query_english, self.conversation_history)
+            if search_query != query_english:
+                print(f"    ✓ Rule-based enrichment applied")
         
         # Step 3: Product Search
         print("\n[3] Searching for products...")
-        products = self._search_products(enriched_query, max_results=5)
+        filters = {
+            'product_type': entities.get('product_type') if entities else None,
+            'colors': entities.get('colors') if entities else None,
+            'brand': entities.get('brand') if entities else None,
+            'price_min': entities.get('price_min') if entities else None,
+            'price_max': entities.get('price_max') if entities else None,
+            'sizes': entities.get('sizes') if entities else None,
+            'features': entities.get('features') if entities else None,
+        }
+        sort_by = entities.get('sort_by') if entities and entities.get('sort_by') else "relevance"
+
+        products = self._search_products(search_query, max_results=5, filters=filters, sort_by=sort_by)
 
         if products:
             print(f"    Found {len(products)} matching products:")
@@ -309,7 +360,7 @@ class ChatbotPipeline:
         # Add to conversation history (store enriched query for better context)
         self.conversation_history.append({
             'user': user_input,
-            'query_english': enriched_query,  # Store enriched query, not original
+            'query_english': search_query,  # Store enriched query, not original
             'response': response,
             'products': [p['name'] for p in products[:3]] if products else [],
             'language': detected_lang
@@ -343,13 +394,13 @@ def main():
     # Test messages (mix of in-context and out-of-context)
     test_messages = [
         "I want a black jacket",              # in-context (English)
-        #"Je veux un pull noire",              # in-context (French)
+        "Je veux un pull noire",              # in-context (French)
         "What's the weather like?",           # out-of-context (English)
-        #"na7eb nechri jacket ka7la",          # in-context (Tunisian)
-        #"أريد شراء جاكيت أسود",              # in-context (Arabic)
+        "na7eb nechri jacket ka7la",          # in-context (Tunisian)
+        "أريد شراء جاكيت أسود",                 # in-context (Arabic)
         "Tell me a joke",                     # out-of-context (English)
         "Show me red dresses",                # in-context (English)
-        #"9addech el wa9t?",                   # out-of-context (Tunisian - "what time is it?")
+        "9addech el wa9t?",                   # out-of-context (Tunisian - "what time is it?")
     ]
     
     for msg in test_messages:
